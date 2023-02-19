@@ -1,0 +1,404 @@
+#pragma version 8
+txn ApplicationID
+int 0
+==
+bnz main_l23
+txn OnCompletion
+int DeleteApplication
+==
+bnz main_l22
+txn OnCompletion
+int UpdateApplication
+==
+bnz main_l21
+txn OnCompletion
+int OptIn
+==
+bnz main_l20
+txn OnCompletion
+int CloseOut
+==
+bnz main_l19
+txn OnCompletion
+int NoOp
+==
+bnz main_l7
+err
+main_l7:
+txna ApplicationArgs 0
+byte "createTask"
+==
+bnz main_l18
+txna ApplicationArgs 0
+byte "closeTask"
+==
+bnz main_l17
+txna ApplicationArgs 0
+byte "pumpToken"
+==
+bnz main_l16
+txna ApplicationArgs 0
+byte "updateSettings"
+==
+bnz main_l15
+txna ApplicationArgs 0
+byte "optinToken"
+==
+bnz main_l13
+err
+main_l13:
+callsub optinToken_4
+main_l14:
+int 0
+return
+main_l15:
+callsub updateSettings_3
+b main_l14
+main_l16:
+callsub pumpToken_2
+b main_l14
+main_l17:
+callsub closeTask_1
+b main_l14
+main_l18:
+callsub createTask_0
+b main_l14
+main_l19:
+int 0
+return
+main_l20:
+int 1
+return
+main_l21:
+int 0
+return
+main_l22:
+int 0
+return
+main_l23:
+callsub handleCreation_5
+int 1
+return
+
+// createTask
+createTask_0:
+proto 0 0
+global GroupSize
+int 2
+==
+txn GroupIndex
+int 0
+==
+&&
+assert
+gtxn 0 RekeyTo
+global ZeroAddress
+==
+gtxn 1 RekeyTo
+global ZeroAddress
+==
+&&
+assert
+gtxn 1 TypeEnum
+int axfer
+==
+gtxn 1 AssetReceiver
+global CurrentApplicationAddress
+==
+&&
+gtxn 1 AssetAmount
+byte "TaskCreationFee"
+app_global_get
+==
+&&
+gtxn 1 XferAsset
+byte "RewardTokenId"
+app_global_get
+==
+&&
+txn NumAppArgs
+int 4
+==
+&&
+txn Sender
+byte "deadline"
+app_local_get
+int 0
+==
+&&
+global LatestTimestamp
+txn Sender
+byte "deadline"
+app_local_get
+>=
+&&
+assert
+txn Sender
+byte "taskSummary"
+txna ApplicationArgs 1
+app_local_put
+txn Sender
+byte "taskDescription"
+txna ApplicationArgs 2
+app_local_put
+txn Sender
+byte "deadline"
+txna ApplicationArgs 3
+app_local_put
+txn Sender
+byte "deposit"
+gtxn 1 AssetAmount
+app_local_put
+byte "Deposit"
+app_global_get
+store 0
+byte "Deposit"
+load 0
+gtxn 1 AssetAmount
++
+app_global_put
+int 1
+return
+
+// closeTask
+closeTask_1:
+proto 0 0
+global GroupSize
+int 2
+==
+txn GroupIndex
+int 0
+==
+&&
+assert
+gtxn 0 RekeyTo
+global ZeroAddress
+==
+assert
+txn NumAppArgs
+int 3
+==
+txna ApplicationArgs 1
+btoi
+int 1214
+!=
+&&
+byte "AvailableRewardPool"
+app_global_get
+byte "RewardRate"
+app_global_get
+txn Sender
+byte "deposit"
+app_local_get
+*
+>=
+&&
+txn Sender
+byte "deadline"
+app_local_get
+int 0
+>=
+&&
+txn Sender
+byte "result"
+app_local_get
+int 0
+==
+&&
+txna ApplicationArgs 2
+btoi
+int 1
+==
+txna ApplicationArgs 2
+btoi
+int 2
+==
+||
+&&
+assert
+byte "RewardRate"
+app_global_get
+txn Sender
+byte "deposit"
+app_local_get
+*
+store 1
+itxn_begin
+int axfer
+itxn_field TypeEnum
+txn Sender
+itxn_field AssetReceiver
+load 1
+itxn_field AssetAmount
+txna ApplicationArgs 1
+btoi
+itxn_field XferAsset
+itxn_submit
+txn Sender
+byte "result"
+txna ApplicationArgs 2
+btoi
+app_local_put
+txn Sender
+byte "reward"
+byte "RewardRate"
+app_global_get
+txn Sender
+byte "deposit"
+app_local_get
+*
+app_local_put
+byte "GivenReward"
+app_global_get
+store 2
+byte "GivenReward"
+load 2
+load 1
++
+app_global_put
+int 1
+return
+
+// pumpToken
+pumpToken_2:
+proto 0 0
+global GroupSize
+int 2
+==
+txn GroupIndex
+int 0
+==
+&&
+assert
+gtxn 0 RekeyTo
+global ZeroAddress
+==
+gtxn 1 RekeyTo
+global ZeroAddress
+==
+&&
+assert
+gtxn 1 TypeEnum
+int axfer
+==
+gtxn 1 AssetReceiver
+global CurrentApplicationAddress
+==
+&&
+gtxn 1 AssetAmount
+byte "TaskCreationFee"
+app_global_get
+==
+&&
+gtxn 1 XferAsset
+byte "RewardTokenId"
+app_global_get
+==
+&&
+txn NumAppArgs
+int 1
+==
+&&
+assert
+byte "AvailableRewardPool"
+app_global_get
+store 3
+byte "AvailableRewardPool"
+load 3
+gtxn 1 AssetAmount
++
+app_global_put
+int 1
+return
+
+// updateSettings
+updateSettings_3:
+proto 0 0
+gtxn 0 RekeyTo
+global ZeroAddress
+==
+assert
+txn Sender
+byte "Owner"
+app_global_get
+==
+txn NumAppArgs
+int 3
+==
+&&
+assert
+byte "RewardRate"
+txna ApplicationArgs 1
+btoi
+app_global_put
+byte "TaskCreationFee"
+txna ApplicationArgs 2
+btoi
+app_global_put
+int 1
+return
+
+// optinToken
+optinToken_4:
+proto 0 0
+global GroupSize
+int 1
+==
+txn GroupIndex
+int 0
+==
+&&
+assert
+gtxn 0 RekeyTo
+global ZeroAddress
+==
+assert
+txn Sender
+byte "Owner"
+app_global_get
+==
+txn NumAppArgs
+int 2
+==
+&&
+assert
+itxn_begin
+int axfer
+itxn_field TypeEnum
+global CurrentApplicationAddress
+itxn_field AssetReceiver
+int 0
+itxn_field AssetAmount
+txna ApplicationArgs 1
+btoi
+itxn_field XferAsset
+itxn_submit
+int 1
+return
+
+// handleCreation
+handleCreation_5:
+proto 0 0
+byte "Owner"
+txn Sender
+app_global_put
+byte "RewardTokenId"
+int 121814966
+app_global_put
+byte "Deposit"
+int 0
+app_global_put
+byte "TaskCreationFee"
+int 1000000
+app_global_put
+byte "RewardRate"
+int 2
+app_global_put
+byte "AvailableRewardPool"
+int 0
+app_global_put
+byte "GivenReward"
+int 0
+app_global_put
+int 1
+return
