@@ -47,21 +47,21 @@ byte "optinToken"
 bnz main_l13
 err
 main_l13:
-callsub optinToken_4
+callsub optintoken_4
 main_l14:
 int 0
 return
 main_l15:
-callsub updateSettings_3
+callsub updatesettings_3
 b main_l14
 main_l16:
-callsub pumpToken_2
+callsub pumptoken_2
 b main_l14
 main_l17:
-callsub closeTask_1
+callsub closetask_1
 b main_l14
 main_l18:
-callsub createTask_0
+callsub createtask_0
 b main_l14
 main_l19:
 int 0
@@ -76,12 +76,12 @@ main_l22:
 int 0
 return
 main_l23:
-callsub handleCreation_5
+callsub handlecreation_5
 int 1
 return
 
-// createTask
-createTask_0:
+// create_task
+createtask_0:
 proto 0 0
 global GroupSize
 int 2
@@ -109,7 +109,7 @@ global CurrentApplicationAddress
 gtxn 1 AssetAmount
 byte "TaskCreationFee"
 app_global_get
-==
+>=
 &&
 gtxn 1 XferAsset
 byte "RewardTokenId"
@@ -126,12 +126,6 @@ app_local_get
 int 0
 ==
 &&
-global LatestTimestamp
-txn Sender
-byte "deadline"
-app_local_get
->=
-&&
 assert
 txn Sender
 byte "taskSummary"
@@ -144,6 +138,7 @@ app_local_put
 txn Sender
 byte "deadline"
 txna ApplicationArgs 3
+btoi
 app_local_put
 txn Sender
 byte "deposit"
@@ -160,11 +155,11 @@ app_global_put
 int 1
 return
 
-// closeTask
-closeTask_1:
+// close_task
+closetask_1:
 proto 0 0
 global GroupSize
-int 2
+int 1
 ==
 txn GroupIndex
 int 0
@@ -175,22 +170,26 @@ gtxn 0 RekeyTo
 global ZeroAddress
 ==
 assert
-txn NumAppArgs
-int 3
-==
-txna ApplicationArgs 1
-btoi
-int 1214
-!=
-&&
-byte "AvailableRewardPool"
-app_global_get
 byte "RewardRate"
 app_global_get
 txn Sender
 byte "deposit"
 app_local_get
 *
+int 100
+/
+store 1
+txn NumAppArgs
+int 3
+==
+txna ApplicationArgs 1
+btoi
+int 1214
+==
+&&
+byte "RewardPool"
+app_global_get
+load 1
 >=
 &&
 txn Sender
@@ -216,13 +215,6 @@ int 2
 ||
 &&
 assert
-byte "RewardRate"
-app_global_get
-txn Sender
-byte "deposit"
-app_local_get
-*
-store 1
 itxn_begin
 int axfer
 itxn_field TypeEnum
@@ -230,8 +222,8 @@ txn Sender
 itxn_field AssetReceiver
 load 1
 itxn_field AssetAmount
-txna ApplicationArgs 1
-btoi
+byte "RewardTokenId"
+app_global_get
 itxn_field XferAsset
 itxn_submit
 txn Sender
@@ -259,8 +251,8 @@ app_global_put
 int 1
 return
 
-// pumpToken
-pumpToken_2:
+// pump_token
+pumptoken_2:
 proto 0 0
 global GroupSize
 int 2
@@ -285,11 +277,6 @@ gtxn 1 AssetReceiver
 global CurrentApplicationAddress
 ==
 &&
-gtxn 1 AssetAmount
-byte "TaskCreationFee"
-app_global_get
-==
-&&
 gtxn 1 XferAsset
 byte "RewardTokenId"
 app_global_get
@@ -300,10 +287,10 @@ int 1
 ==
 &&
 assert
-byte "AvailableRewardPool"
+byte "RewardPool"
 app_global_get
 store 3
-byte "AvailableRewardPool"
+byte "RewardPool"
 load 3
 gtxn 1 AssetAmount
 +
@@ -311,8 +298,8 @@ app_global_put
 int 1
 return
 
-// updateSettings
-updateSettings_3:
+// update_settings
+updatesettings_3:
 proto 0 0
 gtxn 0 RekeyTo
 global ZeroAddress
@@ -338,8 +325,8 @@ app_global_put
 int 1
 return
 
-// optinToken
-optinToken_4:
+// opt_in_token
+optintoken_4:
 proto 0 0
 global GroupSize
 int 1
@@ -376,14 +363,15 @@ itxn_submit
 int 1
 return
 
-// handleCreation
-handleCreation_5:
+// handle_creation
+handlecreation_5:
 proto 0 0
 byte "Owner"
 txn Sender
 app_global_put
 byte "RewardTokenId"
-int 121814966
+txna ApplicationArgs 0
+btoi
 app_global_put
 byte "Deposit"
 int 0
@@ -392,9 +380,10 @@ byte "TaskCreationFee"
 int 1000000
 app_global_put
 byte "RewardRate"
-int 2
+txna ApplicationArgs 1
+btoi
 app_global_put
-byte "AvailableRewardPool"
+byte "RewardPool"
 int 0
 app_global_put
 byte "GivenReward"

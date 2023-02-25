@@ -12,7 +12,7 @@ def approval():
     g_task_creation_fee = Bytes("TaskCreationFee")  # uint64
     g_deposit = Bytes("Deposit")  # unit64
     g_reward_token_id = Bytes("RewardTokenId")  # uint64
-    g_available_reward_pool = Bytes("AvailableRewardPool")  # uint64
+    g_reward_pool = Bytes("RewardPool")  # uint64
     g_reward_rate = Bytes("RewardRate")  # uint64
     g_given_reward = Bytes("GivenReward")  # uint64
 
@@ -45,7 +45,7 @@ def approval():
                     Gtxn[1].type_enum() == TxnType.AssetTransfer,
                     Gtxn[1].asset_receiver(
                     ) == Global.current_application_address(),
-                    Gtxn[1].asset_amount() == App.globalGet(
+                    Gtxn[1].asset_amount() >= App.globalGet(
                         g_task_creation_fee),  # checking correct amount
                     Gtxn[1].xfer_asset() == App.globalGet(
                         g_reward_token_id),  # checking correct token
@@ -61,11 +61,11 @@ def approval():
             App.localPut(Txn.sender(), l_task_description,
                          Txn.application_args[2]),
             App.localPut(Txn.sender(), l_deadline,
-                         Txn.application_args[3]),
+                         Btoi(Txn.application_args[3])),
             App.localPut(Txn.sender(), l_deposit, Gtxn[1].asset_amount()),
 
             count_tally.store(App.globalGet(g_deposit)),
-            App.globalPut(g_deposit, count_tally.load() + \
+            App.globalPut(g_deposit, count_tally.load() +
                           Gtxn[1].asset_amount()),
 
             Approve(),
@@ -88,7 +88,7 @@ def approval():
                     Txn.application_args.length() == Int(3),
                     Btoi(Txn.application_args[1]) == Int(PIN),
                     App.globalGet(
-                        g_available_reward_pool) >= tmp_reward.load(),  # contract has enough balance for reward
+                        g_reward_pool) >= tmp_reward.load(),  # contract has enough balance for reward
                     App.localGet(Txn.sender(), l_deadline) >= Int(0),
                     App.localGet(Txn.sender(), l_result) == Int(0),
                     Or(
@@ -121,7 +121,7 @@ def approval():
         )
 
     @Subroutine(TealType.none)
-    def pum_token():
+    def pump_token():
         count_tally = ScratchVar(TealType.uint64)
         return Seq(
             program.check_self(
@@ -134,8 +134,6 @@ def approval():
                     Gtxn[1].type_enum() == TxnType.AssetTransfer,
                     Gtxn[1].asset_receiver(
                     ) == Global.current_application_address(),
-                    Gtxn[1].asset_amount() == App.globalGet(
-                        g_task_creation_fee),  # Checking correct amount
                     Gtxn[1].xfer_asset() == App.globalGet(
                         g_reward_token_id),  # Checking correct token
                     Txn.application_args.length() == Int(1),
@@ -143,8 +141,8 @@ def approval():
             ),
 
             # Update reward pool
-            count_tally.store(App.globalGet(g_available_reward_pool)),
-            App.globalPut(g_available_reward_pool,
+            count_tally.store(App.globalGet(g_reward_pool)),
+            App.globalPut(g_reward_pool,
                           count_tally.load() + Gtxn[1].asset_amount()),
 
             Approve(),
@@ -206,8 +204,8 @@ def approval():
                           Btoi(Txn.application_args[0])),
             App.globalPut(g_deposit, Int(0)),
             App.globalPut(g_task_creation_fee, Int(1000000)),  # 1 Algos
-            App.globalPut(g_reward_rate, Int(20)),
-            App.globalPut(g_available_reward_pool, Int(0)),
+            App.globalPut(g_reward_rate, Btoi(Txn.application_args[1])),
+            App.globalPut(g_reward_pool, Int(0)),
             App.globalPut(g_given_reward, Int(0)),
 
             Approve(),
@@ -225,7 +223,7 @@ def approval():
             Cond(
                 [Txn.application_args[0] == op_create_task, create_task()],
                 [Txn.application_args[0] == op_close_task, close_task()],
-                [Txn.application_args[0] == op_pump_token, pum_token()],
+                [Txn.application_args[0] == op_pump_token, pump_token()],
                 [Txn.application_args[0] == op_update_settings, update_settings()],
                 [Txn.application_args[0] == op_optin_token, opt_in_token()],
             ),

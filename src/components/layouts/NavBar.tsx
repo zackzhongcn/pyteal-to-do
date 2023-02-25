@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useCallback } from "react";
 import Image from "next/image";
 import PYTEAL_LOGO from "src/assets/pyteal.png";
 import ConnectModal from "../modals/ConnectModal";
@@ -6,34 +6,45 @@ import Button from "@mui/material/Button";
 import { UserConextType, UserContext } from "@/context/userContext";
 import { formatAddress } from "@/common/format";
 import { toast } from "react-toastify";
-import { AlgodContext } from "@/context/algodContext";
-import { ApplicationInfo } from "@/common/type";
+import { AlgorandAccount, ApplicationInfo } from "@/common/type";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import { useAlgodClient } from "@/hooks/useAlgodClient";
+import { useApplicationInfo } from "@/hooks/useApplicationInfo";
 
-type Props = {
-  globalInfo: ApplicationInfo;
-};
-
-const NavBar = (props: Props) => {
-  const { globalInfo } = props;
+const NavBar = () => {
   const [showModal, setShowModal] = useState(false);
 
-  const { userState, authenticate, disconnect } = useContext(
+  const { userState, authenticate, connect, disconnect } = useContext(
     UserContext
   ) as UserConextType;
   const { isConnected, account, isAdmin } = userState;
-  const client = useContext(AlgodContext);
+  const client = useAlgodClient();
+  const globalInfo = useApplicationInfo();
+
+  const router = useRouter();
 
   useEffect(() => {
     console.log("state check");
-    if (client && isConnected && globalInfo.owner) {
+    if (client && isConnected && globalInfo?.owner) {
       const isAdmin = account === globalInfo.owner;
-      console.log("authenticate", isAdmin);
       authenticate(isAdmin);
     }
   }, [client, isConnected, globalInfo]);
 
+  const reconnectAlgoWallet = useCallback(() => {
+    const accountStroage: string | null = localStorage.getItem("account");
+    if (accountStroage) {
+      const algoAccount: AlgorandAccount = JSON.parse(accountStroage);
+      connect(algoAccount.address);
+    }
+  }, []);
+
+  useEffect(() => {
+    reconnectAlgoWallet();
+  }, []);
+
   const connectAlgoWallet = () => {
-    console.log("clicked", showModal);
     setShowModal(true);
   };
 
@@ -51,10 +62,16 @@ const NavBar = (props: Props) => {
             <Image src={PYTEAL_LOGO} alt="Pyteal" width={120}></Image>
           </div>
           {isConnected ? (
-            <div className="flex justify-center">
+            <div className="flex justify-center items-center">
               {isAdmin && (
-                <div className="mr-3">
-                  <Button variant="text">Admin Portal</Button>
+                <div>
+                  <div className="mr-3">
+                    {router.pathname.includes("admin") ? (
+                      <Link href="/">User Portal</Link>
+                    ) : (
+                      <Link href="/admin">Admin Portal</Link>
+                    )}
+                  </div>
                 </div>
               )}
               <div>

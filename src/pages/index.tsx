@@ -1,14 +1,13 @@
 import React, { useEffect, useState, useContext, useCallback } from "react";
 import Head from "next/head";
-import { Typography, Grid, Box } from "@mui/material";
-import { AlgodContext } from "@/context/algodContext";
+import { Typography } from "@mui/material";
 import { toast } from "react-toastify";
 import algosdk from "algosdk";
-import { ApplicationInfo, ContractState } from "@/common/type";
-
-type Props = {
-  globalInfo: ApplicationInfo;
-};
+import ApplicationInfoCard from "@/components/ApplicationInfoCard";
+import CreateTaskFormCard from "@/components/CreateTaskFormCard";
+import { useLocalState } from "@/hooks/useLocalState";
+import { UserConextType, UserContext } from "@/context/userContext";
+import TaskCard from "@/components/TaskCard";
 
 const style = {
   width: 700,
@@ -17,9 +16,13 @@ const style = {
   border: "1px solid #aaaaaa",
 };
 
-export default function Home(props: Props) {
-  const { globalInfo } = props;
-  const client = useContext(AlgodContext);
+export default function Home() {
+  const [updated, setUpdated] = useState<boolean>(false);
+
+  const { userState } = useContext(UserContext) as UserConextType;
+  const { account, isAdmin } = userState;
+
+  const localState = useLocalState(account, updated);
 
   return (
     <>
@@ -30,34 +33,28 @@ export default function Home(props: Props) {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <Typography variant="h4" component="h1" className="text-center my-3">
+      <Typography variant="h3" component="h1" className="text-center my-3">
         To-Do Application
       </Typography>
 
-      <div className="flex justify-center">
-        <Box sx={style}>
-          <Typography variant="h6" component="h2" className="mb-2">
-            Application Information
-          </Typography>
-          <div className="grid grid-cols-4 gap-3 text-center">
-            <div>
-              <div>Reward Token</div>
-              <div>{globalInfo ? globalInfo.rewardTokenId : "-"}</div>
-            </div>
-            <div>
-              <div>Reward Pool</div>
-              <div>{globalInfo ? globalInfo.rewardPool : "-"}</div>
-            </div>
-            <div>
-              <div>Given Reward</div>
-              <div>{globalInfo ? globalInfo.givenRewards : "-"}</div>
-            </div>
-            <div>
-              <div>Reward Rate</div>
-              <div>{globalInfo ? globalInfo.rewardRate : "-"}</div>
-            </div>
-          </div>
-        </Box>
+      <div className="mb-4">
+        <ApplicationInfoCard updated={updated} />
+      </div>
+
+      <div className="mb-4">
+        {localState?.deadline ? (
+          <TaskCard
+            updated={updated}
+            setUpdated={setUpdated}
+            localState={localState}
+          />
+        ) : (
+          <CreateTaskFormCard
+            updated={updated}
+            setUpdated={setUpdated}
+            opttedin={localState?.opttedin}
+          />
+        )}
       </div>
     </>
   );

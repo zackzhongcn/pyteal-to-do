@@ -17,3 +17,13 @@ export type ApplicationInfo = {
   rewardRate: number;
   creationFee: number;
 };
+
+export type LocalState = {
+  summary: string;
+  description: string;
+  deadline: number;
+  deposit: number;
+  reward: number;
+  result: boolean;
+  opttedin: boolean;
+};
