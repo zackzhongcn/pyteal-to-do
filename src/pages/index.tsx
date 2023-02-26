@@ -20,7 +20,7 @@ export default function Home() {
   const [updated, setUpdated] = useState<boolean>(false);
 
   const { userState } = useContext(UserContext) as UserConextType;
-  const { account, isAdmin } = userState;
+  const { account } = userState;
 
   const localState = useLocalState(account, updated);
 

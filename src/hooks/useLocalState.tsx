@@ -12,7 +12,7 @@ export const useLocalState = (
 
   const client = useAlgodClient();
 
-  const getApplicationInfo = useCallback(async (): Promise<void> => {
+  const getAccountApplicationInfo = useCallback(async (): Promise<void> => {
     if (client) {
       try {
         if (client && address) {
@@ -69,6 +69,10 @@ export const useLocalState = (
             tmpState.opttedin = false;
             setLocalState(tmpState);
           }
+        } else if (client && !address) {
+          const tmpState: LocalState = {} as LocalState;
+          tmpState.opttedin = false;
+          setLocalState(tmpState);
         }
       } catch (error: any) {
         console.log("error: ", error);
@@ -80,7 +84,8 @@ export const useLocalState = (
   }, [client, address, updated]);
 
   useEffect(() => {
-    getApplicationInfo();
+    console.log("account info address: ", address);
+    getAccountApplicationInfo();
   }, [client, address, updated]);
 
   return localState;

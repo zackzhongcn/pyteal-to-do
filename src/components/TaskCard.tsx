@@ -1,17 +1,22 @@
-import React, { useContext } from "react";
-import { Typography, Box, Button } from "@mui/material";
+import React, { useContext, useState } from "react";
+import {
+  Typography,
+  Box,
+  Button,
+  TextField,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  FormLabel,
+} from "@mui/material";
 import { AlgorandAccount, LocalState } from "@/common/type";
 import { useForm, Controller } from "react-hook-form";
 import { SubmitHandler } from "react-hook-form/dist/types";
 import { UserConextType, UserContext } from "@/context/userContext";
 import {
   getApplicationAddress,
-  algosToMicroalgos,
   makeApplicationNoOpTxnFromObject,
   waitForConfirmation,
-  makeAssetTransferTxnWithSuggestedParamsFromObject,
-  assignGroupID,
-  Transaction,
 } from "algosdk";
 import { formatToUint8Array } from "@/common/format";
 import { toast } from "react-toastify";
@@ -19,7 +24,6 @@ import { useAlgodClient } from "@/hooks/useAlgodClient";
 import MyAlgoConnect from "@randlabs/myalgo-connect";
 import { PeraWalletConnect } from "@perawallet/connect";
 import { useApplicationInfo } from "@/hooks/useApplicationInfo";
-import { useTokenBalance } from "@/hooks/useTokenBalance";
 import moment from "moment";
 
 type Props = {
@@ -29,10 +33,8 @@ type Props = {
 };
 
 type TaskFormValues = {
-  summary: string;
-  description: string;
-  deadline: moment.Moment | null;
-  depositAmount: Number;
+  pin: Number;
+  result: Number;
 };
 
 const style = {
@@ -44,13 +46,13 @@ const style = {
 
 const TaskCard = (props: Props) => {
   const { updated, setUpdated, localState } = props;
+  const [showForm, setShowForm] = useState<boolean>(false);
 
   const { userState } = useContext(UserContext) as UserConextType;
-  const { account, isAdmin } = userState;
+  const { account, isConnected } = userState;
 
   const client = useAlgodClient();
   const globalInfo = useApplicationInfo(updated);
-  const tokenBalance = useTokenBalance(account);
 
   const {
     control,
@@ -58,13 +60,12 @@ const TaskCard = (props: Props) => {
     reset,
     formState: { errors },
   } = useForm<TaskFormValues>({
-    defaultValues: {
-      summary: "",
-      description: "",
-      deadline: null,
-      depositAmount: "",
-    },
+    defaultValues: { pin: "", result: "" },
   });
+
+  const startToSubmit = () => {
+    setShowForm(true);
+  };
 
   const onSubmit: SubmitHandler<TaskFormValues> = async (
     data: TaskFormValues
@@ -75,37 +76,25 @@ const TaskCard = (props: Props) => {
         process.env.NEXT_PUBLIC_APPLICATION_ID ?? "0"
       );
       const applicationAddress = getApplicationAddress(applicationId);
-      console.log("address: ", applicationAddress, data.deadline?.unix());
+      console.log("address: ", applicationAddress);
       if (client && globalInfo && applicationId !== 0) {
         const suggestedParams = await client.getTransactionParams().do();
 
         const appArgs = [
-          new Uint8Array(Buffer.from("createTask")),
-          new Uint8Array(Buffer.from(data.summary)),
-          new Uint8Array(Buffer.from(data.description)),
-          formatToUint8Array(data.deadline?.unix() ?? 0),
+          new Uint8Array(Buffer.from("closeTask")),
+          formatToUint8Array(data.pin as number),
+          formatToUint8Array(data.result as number),
         ];
         console.log("args: ", appArgs);
+        suggestedParams.fee = 2000;
+        suggestedParams.flatFee = true;
         const applicationTxn = makeApplicationNoOpTxnFromObject({
           from: account ?? "",
           suggestedParams: suggestedParams,
           appIndex: applicationId,
           appArgs: appArgs,
+          foreignAssets: [globalInfo.rewardTokenId],
         });
-
-        const assetTxn = makeAssetTransferTxnWithSuggestedParamsFromObject({
-          amount: algosToMicroalgos(data.depositAmount as number),
-          assetIndex: globalInfo.rewardTokenId,
-          from: account ?? "",
-          to: applicationAddress,
-          suggestedParams: suggestedParams,
-        });
-
-        const txns = [applicationTxn, assetTxn];
-        assignGroupID(txns);
-        const groupTxns = txns.map((element: Transaction) => ({
-          txn: Buffer.from(element.toByte()).toString("base64"),
-        }));
 
         const accountStroage: string | null = localStorage.getItem("account");
         if (accountStroage) {
@@ -114,34 +103,30 @@ const TaskCard = (props: Props) => {
             const pera = new PeraWalletConnect();
           } else {
             const myAlgo = new MyAlgoConnect();
-            const tempSignedTxns = await myAlgo.signTxns(groupTxns);
-            const signedTxns = tempSignedTxns.map(
-              (txn: string | null) =>
-                new Uint8Array(Buffer.from(txn as string, "base64"))
+            const signedTxn = await myAlgo.signTransaction(
+              Buffer.from(applicationTxn.toByte()).toString("base64")
             );
-            const { txId } = await client.sendRawTransaction(signedTxns).do();
+            const { txId } = await client
+              .sendRawTransaction(signedTxn.blob)
+              .do();
             const result = await waitForConfirmation(client, txId, 4);
             console.log("result: ", result);
             setUpdated(!updated);
-            toast.success("Successfully create a task.");
+            toast.success("Successfully close a task.");
+            setShowForm(false);
           }
         }
       } else {
         toast.error("Please refersh and try again or contact support.");
       }
-      reset({
-        summary: "",
-        description: "",
-        deadline: null,
-        depositAmount: "",
-      });
+      reset({ pin: "", result: "" });
     } catch (error: any) {
       console.log("error: ", error);
       if (error.toString().includes("Operation cancelled")) {
         toast.warn("Operation cancelled, please try agian.");
       } else {
         toast.error(
-          "Failed to creat a task, pleas try again or contact support."
+          "Failed to close a task, pleas try again or contact support."
         );
       }
     }
@@ -171,10 +156,78 @@ const TaskCard = (props: Props) => {
               : "-"}
           </div>
         </div>
-
-        <div className="text-center">
-          <Button variant="outlined">Submit Result</Button>
+        <div className="mb-2 border-b border-slate-900/30">
+          <small className="mb-1">Deposit</small>
+          <div className="text-xl">{localState ? localState.deposit : "-"}</div>
         </div>
+
+        {showForm ? (
+          <form className="mt-5" onSubmit={handleSubmit(onSubmit)}>
+            <Controller
+              name="pin"
+              control={control}
+              rules={{ required: true }}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  variant="outlined"
+                  label="PIN"
+                  className="mb-3"
+                  fullWidth={true}
+                  type="number"
+                ></TextField>
+              )}
+            />
+            <Controller
+              name="result"
+              control={control}
+              rules={{ required: true }}
+              render={({ field }) => (
+                <div className="ml-2">
+                  <FormLabel>Result</FormLabel>
+                  <RadioGroup {...field} row>
+                    <FormControlLabel
+                      value={1}
+                      control={<Radio />}
+                      label="Done"
+                    />
+                    <FormControlLabel
+                      value={2}
+                      control={<Radio />}
+                      label="Incomplete"
+                    />
+                  </RadioGroup>
+                </div>
+              )}
+            />
+            <div className="text-center">
+              <Button variant="outlined" type="submit">
+                Submit Result
+              </Button>
+            </div>
+          </form>
+        ) : localState?.result ? (
+          <>
+            <div className="mb-2 border-b border-slate-900/30">
+              <small className="mb-1">Reward</small>
+              <div className="text-xl">
+                {localState ? localState.reward : "-"}
+              </div>
+            </div>
+            <div className="mb-2 border-b border-slate-900/30">
+              <small className="mb-1">Result</small>
+              <div className="text-xl">
+                {localState ? (localState.result ? "Done" : "Incomplete") : "-"}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-center">
+            <Button variant="outlined" onClick={() => startToSubmit()}>
+              Start to Submit Result
+            </Button>
+          </div>
+        )}
       </Box>
     </div>
   );

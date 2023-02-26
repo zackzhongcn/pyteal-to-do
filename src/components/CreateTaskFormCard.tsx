@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { Typography, Box, TextField, Button } from "@mui/material";
 import { AdapterMoment } from "@mui/x-date-pickers/AdapterMoment";
 import { AlgorandAccount } from "@/common/type";
@@ -24,6 +24,7 @@ import { useApplicationInfo } from "@/hooks/useApplicationInfo";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
+import ConnectModal from "./modals/ConnectModal";
 
 type Props = {
   updated: boolean;
@@ -47,13 +48,15 @@ const style = {
 
 const CreateTaskFormCard = (props: Props) => {
   const { updated, setUpdated, opttedin } = props;
+  const [tokenUpdated, setTokenUpdated] = useState<boolean>(false);
+  const [showModal, setShowModal] = useState<boolean>(false);
 
   const { userState } = useContext(UserContext) as UserConextType;
-  const { account, isAdmin } = userState;
+  const { account, isConnected } = userState;
 
   const client = useAlgodClient();
   const globalInfo = useApplicationInfo(updated);
-  const tokenBalance = useTokenBalance(account);
+  const tokenBalance = useTokenBalance(account, tokenUpdated);
 
   const {
     control,
@@ -69,6 +72,60 @@ const CreateTaskFormCard = (props: Props) => {
     },
   });
 
+  const connectAlgoWallet = () => {
+    setShowModal(true);
+  };
+
+  const reloadBalancce = async () => {
+    if (client && globalInfo) {
+      const suggestedParams = await client.getTransactionParams().do();
+      const accountInfo = await client
+        .accountInformation(account as string)
+        .do();
+      const assets = accountInfo.assets.filter(
+        (a: any) => a["asset-id"] === globalInfo.rewardTokenId
+      );
+      // optin token if not
+      if (assets.length === 0) {
+        const assetOptTxn = makeAssetTransferTxnWithSuggestedParamsFromObject({
+          from: account as string,
+          to: account as string,
+          amount: 0,
+          assetIndex: globalInfo.rewardTokenId as number,
+          suggestedParams: suggestedParams,
+        });
+        const accountStroage: string | null = localStorage.getItem("account");
+        if (accountStroage) {
+          const algoAccount: AlgorandAccount = JSON.parse(accountStroage);
+          if (algoAccount.provider === "Pera") {
+            const pera = new PeraWalletConnect();
+          } else {
+            const myAlgo = new MyAlgoConnect();
+            try {
+              const signedTxn = await myAlgo.signTransaction(
+                Buffer.from(assetOptTxn.toByte()).toString("base64")
+              );
+              const { txId } = await client
+                .sendRawTransaction(signedTxn.blob)
+                .do();
+              await waitForConfirmation(client, txId, 4);
+              toast.success("Successfully optin the token.");
+            } catch (error: any) {
+              if (error.toString().includes("Operation cancelled")) {
+                toast.warn("Operation cancelled, please try agian.");
+              } else {
+                toast.error(
+                  "Failed to creat a task, pleas try again or contact support."
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+    setTokenUpdated(!tokenUpdated);
+  };
+
   const onSubmit: SubmitHandler<TaskFormValues> = async (
     data: TaskFormValues
   ) => {
@@ -80,6 +137,18 @@ const CreateTaskFormCard = (props: Props) => {
       const applicationAddress = getApplicationAddress(applicationId);
       console.log("address: ", applicationAddress, data.deadline?.unix());
       if (client && globalInfo && applicationId !== 0) {
+        if (Number(data.depositAmount) > tokenBalance) {
+          toast.error(
+            "You don't have enough balance, please get the funds and try again."
+          );
+          return;
+        }
+
+        if (Number(data.depositAmount) < globalInfo.creationFee) {
+          toast.error("Please depoist more than creation fee.");
+          return;
+        }
+
         const suggestedParams = await client.getTransactionParams().do();
 
         const optinTxn = makeApplicationOptInTxnFromObject({
@@ -123,11 +192,17 @@ const CreateTaskFormCard = (props: Props) => {
             const pera = new PeraWalletConnect();
           } else {
             const myAlgo = new MyAlgoConnect();
-            // optin
-            if (opttedin) {
+
+            // optin application
+            console.log("optted in", opttedin);
+            if (!opttedin) {
               const signedOptinTxn = await myAlgo.signTransaction(
                 Buffer.from(optinTxn.toByte()).toString("base64")
               );
+              const { txId: optinTxId } = await client
+                .sendRawTransaction(signedOptinTxn.blob)
+                .do();
+              await waitForConfirmation(client, optinTxId, 4);
             }
 
             const tempSignedTxns = await myAlgo.signTxns(groupTxns);
@@ -181,6 +256,7 @@ const CreateTaskFormCard = (props: Props) => {
                 label="Task Summary"
                 className="mb-3"
                 fullWidth={true}
+                disabled={!isConnected}
               ></TextField>
             )}
           />
@@ -195,6 +271,7 @@ const CreateTaskFormCard = (props: Props) => {
                 label="Task Description"
                 className="mb-3"
                 fullWidth={true}
+                disabled={!isConnected}
                 multiline
                 rows={4}
               ></TextField>
@@ -211,13 +288,20 @@ const CreateTaskFormCard = (props: Props) => {
                     <TextField {...props} fullWidth={true} className="my-3" />
                   )}
                   label="DateTimePicker"
+                  disabled={!isConnected}
                   {...field}
                 />
               </LocalizationProvider>
             )}
           />
-          <label className="float-right mr-2">
-            Balance: {formatNumberComma(tokenBalance)}
+          <label className="float-right mr-2 flex items-center">
+            Balance: {formatNumberComma(tokenBalance)}&nbsp;&nbsp;
+            <button
+              className="hover:opacity-50"
+              onClick={() => reloadBalancce()}
+            >
+              Reload
+            </button>
           </label>
           <Controller
             name="depositAmount"
@@ -230,18 +314,27 @@ const CreateTaskFormCard = (props: Props) => {
                 label="Deposit Amount"
                 className="mb-3"
                 fullWidth={true}
+                disabled={!isConnected}
                 type="number"
               ></TextField>
             )}
           />
           <div className="ml-2">Creation Fee: {globalInfo?.creationFee}</div>
           <div className="text-center">
-            <Button variant="outlined" type="submit">
-              Create Task
-            </Button>
+            {isConnected ? (
+              <Button variant="outlined" disabled={!isConnected} type="submit">
+                Create Task
+              </Button>
+            ) : (
+              <Button variant="outlined" onClick={() => connectAlgoWallet()}>
+                Connect
+              </Button>
+            )}
           </div>
         </form>
       </Box>
+
+      <ConnectModal show={showModal} setShow={setShowModal} />
     </div>
   );
 };

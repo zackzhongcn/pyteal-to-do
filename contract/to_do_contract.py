@@ -110,8 +110,7 @@ def approval():
             # update the task status
             App.localPut(Txn.sender(), l_result,
                          Btoi(Txn.application_args[2])),
-            App.localPut(Txn.sender(), l_reward, Mul(App.globalGet(
-                g_reward_rate), App.localGet(Txn.sender(), l_deposit))),
+            App.localPut(Txn.sender(), l_reward, tmp_reward.load()),
 
             total_given_reward.store(App.globalGet(g_given_reward)),
             App.globalPut(g_given_reward,

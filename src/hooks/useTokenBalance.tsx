@@ -3,7 +3,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useAlgodClient } from "./useAlgodClient";
 import { useApplicationInfo } from "./useApplicationInfo";
 
-export const useTokenBalance = (address: string | null) => {
+export const useTokenBalance = (
+  address: string | null,
+  updated: boolean = false
+) => {
   const [tokenBalance, setTokenBalance] = useState<number>(0);
 
   const client = useAlgodClient();
@@ -18,14 +21,14 @@ export const useTokenBalance = (address: string | null) => {
         setTokenBalance(microalgosToAlgos(assetInfo["asset-holding"].amount));
       }
     }
-  }, [client, address, globalInfo]);
+  }, [client, address, globalInfo, updated]);
 
   useEffect(() => {
     if (client && address && globalInfo?.rewardTokenId) {
       console.log("here: token balance");
       getTokenBalance();
     }
-  }, [client, address, globalInfo]);
+  }, [client, address, globalInfo, updated]);
 
   return tokenBalance;
 };
